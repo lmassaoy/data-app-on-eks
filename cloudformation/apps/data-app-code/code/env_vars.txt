@@ -1,0 +1,3 @@
+export BUCKET_NAME=$(aws cloudformation --region us-east-1 describe-stacks --stack-name data-app-object-store --query "Stacks[0].Outputs[?OutputKey=='AnimeBucketName'].OutputValue" --output text)
+export GENRES_FILE=animes_genres.parquet
+export ANIME_FILE=prepared_animes.parquet

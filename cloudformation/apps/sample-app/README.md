@@ -23,3 +23,8 @@ $ curl http://<EXTERNAL-IP>:80
 Now you should be able to access using your browser http://<EXTERNAL-IP>. Example: http://a814fb2687370428fac40a146d3e8848-1420776689.us-east-1.elb.amazonaws.com/
 
 [![2048.png](2048.png)](2048.png)
+
+Run the following commands to drop the components created above:
+```
+$ kubectl delete -f cloudformation/apps/sample-app/sample-service.yaml
+```

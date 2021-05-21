@@ -1,0 +1,34 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Template responsible to build the DevOps pipeline.
+
+Parameters:
+  # CodeCommit
+  RepoName:
+    Default: data-app
+    Type: String
+    Description: Name of the CodeCommit Repository that stores the application codes and scripts
+  RepoDesc:
+    Default: Data App codes and scripts
+    Type: String
+    Description: Description of the CodeCommit Repository
+
+
+Resources:
+  DataAppRepo:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryName: !Ref RepoName
+      RepositoryDescription: !Ref RepoDesc
+
+
+Outputs:
+  DataAppRepoName:
+    Value: !GetAtt DataAppRepo.Name
+    Description: Name of the CodeCommit Repository that stores the application codes and scripts
+  DataAppRepoURLSSH:
+    Value: !GetAtt DataAppRepo.CloneUrlHttp
+    Description: URL to clone using HTTP of the CodeCommit Repository
+  DataAppRepoURLArn:
+    Value: !GetAtt DataAppRepo.Arn
+    Description: Arn of the CodeCommit Repository

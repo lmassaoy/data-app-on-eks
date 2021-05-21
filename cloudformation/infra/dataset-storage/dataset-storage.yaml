@@ -1,0 +1,26 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Template responsible to build the Amazon S3 bucket to store our anime data
+
+
+Parameters:
+  # S3
+  AnimeBucketName:
+    Default: anime-bucket
+    Type: String
+    Description: Name of the CodeCommit Repository that stores the application codes and scripts
+
+
+Resources:
+  AnimeBucket:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      BucketName: !Sub '${AnimeBucketName}-${AWS::AccountId}-${AWS::Region}'
+
+
+Outputs:
+  AnimeBucketName:
+    Value: !Ref AnimeBucket
+    Description: Name of the bucket storing the anime dataset
+    Export:
+      Name: AnimeBucketName
