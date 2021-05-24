@@ -1,10 +1,12 @@
 # Building the Storage for the Dataset
 
-## Pre-Reqs
+## Pre-reqs:
 
-- AWS CLI
+- AWS CLI already configured (version >= 2.1.6)
 
 ## CloudFormation execution to build the cloud components
+
+Run the following command to build a stack that creates a Amazon S3 bucket to store our datasets
 ```
 $ aws cloudformation deploy \
     --template-file cloudformation/infra/dataset-storage/dataset-storage.yaml \
@@ -14,8 +16,12 @@ $ aws cloudformation deploy \
 ```
 
 ## Sending the datasets into the S3 bucket
+
+Now we'll send our datasets to the bucket.
 ```
-$ BUCKET_NAME=$(aws cloudformation --region us-east-1 describe-stacks --stack-name data-app-object-store --query "Stacks[0].Outputs[?OutputKey=='AnimeBucketName'].OutputValue" --output text)
+$ export BUCKET_NAME=$(aws cloudformation --region us-east-1 describe-stacks --stack-name data-app-object-store --query "Stacks[0].Outputs[?OutputKey=='AnimeBucketName'].OutputValue" --output text)
 
 $ aws s3 cp --recursive dataset/ s3://$BUCKET_NAME/
 ```
+Once its done, you should see your files stored.
+![S3-Bucket.png](../../../images/S3-Bucket.png)

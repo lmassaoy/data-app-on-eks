@@ -4,6 +4,11 @@ Description: >
 
 
 Parameters:
+  # Generic
+  ProjectName:
+    Default: DataAppOnEKS
+    Type: String
+    Description: Name of the project
   # S3
   AnimeBucketName:
     Default: anime-bucket
@@ -16,6 +21,9 @@ Resources:
     Type: "AWS::S3::Bucket"
     Properties:
       BucketName: !Sub '${AnimeBucketName}-${AWS::AccountId}-${AWS::Region}'
+      Tags:
+          - Key: ProjectName
+            Value: !Ref ProjectName
 
 
 Outputs:

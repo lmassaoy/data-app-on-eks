@@ -3,6 +3,21 @@ Description: >
   Template responsible to build the DevOps pipeline.
 
 Parameters:
+  # Generic
+  ProjectName:
+    Default: DataAppOnEKS
+    Type: String
+    Description: Name of the project
+  # KMS
+  KeyName:
+    Default: data-app-cmk
+    Type: String
+    Description: Name of the KMS key used to encrypt secrets
+  # ECR
+  ECRRepositoryName:
+    Default: data-app-on-eks
+    Type: String
+    Description: ECR repository name
   # CodeCommit
   RepoName:
     Default: data-app
@@ -12,14 +27,430 @@ Parameters:
     Default: Data App codes and scripts
     Type: String
     Description: Description of the CodeCommit Repository
-
+  # CodeBuild
+  CodeBuildRoleName:
+    Default: data-app-codebuild-role
+    Type: String
+    Description: Name of the role used for CodeBuild Project
+  CodeBuildPolicyName:
+    Default: data-app-codebuild-policy
+    Type: String
+    Description: Name of the policy used for the CodeBuild role
+  CodeBuildProjectName:
+    Default: data-app-build
+    Type: String
+    Description: CodeBuild project name
+  # CodePipeline
+  CodePipelineRolePolicy:
+    Default: data-app-codepipeline-policy
+    Type: String
+    Description: Name of the policy used for the CodePipeline role
+  CodePipelineTrustRoleName:
+    Default: data-app-pipeline
+    Type: String
+    Description: Name of the policy used for the CodePipeline role
+  ReleasePipelineName:
+    Default: data-app-release
+    Type: String
+    Description: CodePipeline role name
+  # CloudWatch
+  SourceEventName:
+    Default: data-app-trigger-source-event
+    Type: String
+    Description: Name of the policy used for the CodePipeline role 
 
 Resources:
+  CMKAlias:
+    DependsOn:
+      EncryptKey
+    Type: AWS::KMS::Alias
+    Properties: 
+      AliasName: !Sub alias/${KeyName}
+      TargetKeyId: !Ref EncryptKey
+
+
+  EncryptKey:
+    Type: AWS::KMS::Key
+    Properties: 
+      Description: CMK used to encrypt/decrypt data
+      KeyPolicy:
+        Version: '2012-10-17'
+        Id: key-default-1
+        Statement:
+        - Sid: Enable IAM User Permissions
+          Effect: Allow
+          Principal:
+            AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+          Action: kms:*
+          Resource: '*'
+        - Sid: Allow administration of the key
+          Effect: Allow
+          Principal:
+            AWS:
+              - !Sub arn:aws:iam::${AWS::AccountId}:user/cloudformation
+              - !Sub arn:aws:iam::${AWS::AccountId}:role/AdminAccess
+              - !Sub arn:aws:iam::${AWS::AccountId}:role/Admin
+          Action:
+            - kms:Create*
+            - kms:Describe*
+            - kms:Enable*
+            - kms:List*
+            - kms:Put*
+            - kms:Update*
+            - kms:Revoke*
+            - kms:Disable*
+            - kms:Get*
+            - kms:Delete*
+            - kms:ScheduleKeyDeletion
+            - kms:CancelKeyDeletion
+          Resource: '*'
+        - Sid: Allow use of the key
+          Effect: Allow
+          Principal:
+            AWS:
+              - !Sub arn:aws:iam::${AWS::AccountId}:user/cloudformation
+              - !Sub arn:aws:iam::${AWS::AccountId}:role/AdminAccess
+              - !Sub arn:aws:iam::${AWS::AccountId}:role/Admin
+          Action:
+            - kms:DescribeKey
+            - kms:Encrypt
+            - kms:Decrypt
+            - kms:ReEncrypt*
+            - kms:GenerateDataKey
+            - kms:GenerateDataKeyWithoutPlaintext
+          Resource: '*'
+      Tags:
+        - Key: ProjectName
+          Value: !Ref ProjectName
+
+
   DataAppRepo:
     Type: AWS::CodeCommit::Repository
     Properties:
       RepositoryName: !Ref RepoName
       RepositoryDescription: !Ref RepoDesc
+      Tags:
+        - Key: ProjectName
+          Value: !Ref ProjectName
+
+
+  ECRRepository: 
+    Type: AWS::ECR::Repository
+    Properties: 
+      RepositoryName: !Ref ECRRepositoryName
+      Tags:
+        - Key: ProjectName
+          Value: !Ref ProjectName
+
+
+  CodeBuildPolicy:
+    Type: AWS::IAM::Policy
+    Description: Setting IAM policy for service role for CodeBuild
+    Properties:
+      PolicyName: !Ref CodeBuildPolicyName
+      Roles:
+        - !Ref 'CodeBuildRole'
+      PolicyDocument:
+        Statement:
+        - Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Effect: Allow
+          Resource:
+            - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${CodeBuildProjectName}"
+            - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${CodeBuildProjectName}:*
+        - Action:
+            - s3:PutObject
+            - s3:GetObject
+            - s3:GetObjectVersion
+            - s3:GetBucketAcl
+            - s3:GetBucketLocation
+          Effect: Allow
+          Resource:
+            - !Sub arn:aws:s3:::codepipeline-${AWS::Region}-*
+        - Action:
+            - codecommit:GitPull
+          Effect: Allow
+          Resource:
+            - !GetAtt DataAppRepo.Arn
+        - Action:
+            - codebuild:CreateReportGroup
+            - codebuild:CreateReport
+            - codebuild:UpdateReport
+            - codebuild:BatchPutTestCases
+            - codebuild:BatchPutCodeCoverages
+          Effect: Allow
+          Resource:
+            - !Sub arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/${CodeBuildProjectName}-*
+        - Action:
+            - ecr:GetAuthorizationToken
+          Effect: Allow
+          Resource:
+            - '*'
+        - Action:
+            - ecr:GetDownloadUrlForLayer
+            - ecr:BatchGetImage
+            - ecr:CompleteLayerUpload
+            - ecr:DescribeImages
+            - ecr:DescribeRepositories
+            - ecr:UploadLayerPart
+            - ecr:ListImages
+            - ecr:InitiateLayerUpload
+            - ecr:BatchCheckLayerAvailability
+            - ecr:PutImage
+          Effect: Allow
+          Resource:
+            - !GetAtt ECRRepository.Arn
+        - Action:
+            - kms:Decrypt
+            - ssm:GetParameters
+            - ssm:GetParameter
+            - kms:GenerateDataKey
+          Effect: Allow
+          Resource:
+            - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/data-app/dockerhub/*
+            - !GetAtt EncryptKey.Arn
+        - Action:
+            - s3:PutObject
+            - s3:GetObject
+            - s3:ListBucket
+            - s3:GetBucketVersioning
+            - s3:DeleteObject
+          Effect: Allow
+          Resource: 
+            - !Sub 'arn:aws:s3:::anime-bucket-${AWS::AccountId}-${AWS::Region}/*'
+        - Action:
+          - s3:ListBucket
+          Effect: Allow
+          Resource: 
+            - !Sub 'arn:aws:s3:::anime-bucket-${AWS::AccountId}-${AWS::Region}'
+
+
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Description: Creating service role in IAM for AWS CodeBuild
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service: codebuild.amazonaws.com
+      Path: /
+      RoleName: !Ref CodeBuildRoleName
+
+
+  CodeBuildProject:
+    DependsOn:
+      - CodeBuildRole
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Ref CodeBuildProjectName
+      Description: CodeBuild project to build our docker image and push it into ECR repository
+      Artifacts:
+        Type: no_artifacts
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:3.0
+        Type: LINUX_CONTAINER
+        PrivilegedMode: True
+        EnvironmentVariables:
+          - Name: AWS_REGION
+            Type: PLAINTEXT
+            Value: !Sub ${AWS::Region}
+          - Name: AWS_ACCOUNT_ID
+            Type: PLAINTEXT
+            Value: !Sub ${AWS::AccountId}
+          - Name: IMAGE_REPO_NAME
+            Type: PLAINTEXT
+            Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ECRRepositoryName}
+          - Name: DOCKERHUB_USERNAME
+            Type: PARAMETER_STORE
+            Value: /data-app/dockerhub/username
+          - Name: DOCKERHUB_PASSWORD
+            Type: PARAMETER_STORE
+            Value: /data-app/dockerhub/password
+      ServiceRole: !Ref CodeBuildRole
+      Source:
+        Type: CODECOMMIT
+        Location: !GetAtt DataAppRepo.CloneUrlHttp
+        GitCloneDepth: 1
+      SourceVersion: refs/heads/master
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Sub /aws/codebuild/${CodeBuildProjectName}
+          Status: ENABLED
+      Tags:
+        - Key: ProjectName
+          Value: !Ref ProjectName
+
+
+  SourceEvent:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Ref SourceEventName
+      Description: Rule for Amazon CloudWatch Events to detect changes to the source repository and trigger pipeline execution
+      State: ENABLED      
+      EventPattern:
+        detail:
+          event:
+          - referenceCreated
+          - referenceUpdated
+          referenceName:
+          - master
+          referenceType:
+          - branch
+        detail-type:
+          - CodeCommit Repository State Change
+        resources:
+          - !Sub arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:${RepoName}
+        source:
+          - aws.codecommit
+      Targets:
+      - Arn: !Sub arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${ReleasePipelineName}
+        Id: ProjectPipelineTarget
+        RoleArn: !GetAtt SourceEventRole.Arn
+
+
+  SourceEventRole:
+    Type: AWS::IAM::Role
+    Description: IAM role to allow Amazon CloudWatch Events to trigger AWS CodePipeline execution
+    Properties:
+      RoleName: !Sub ${RepoName}-CloudWatchEventRule
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - events.amazonaws.com
+          Sid: 1
+      Policies:
+      - PolicyDocument:
+          Statement:
+          - Action:
+              - codepipeline:StartPipelineExecution
+            Effect: Allow
+            Resource: !Sub arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${ReleasePipelineName}
+        PolicyName: !Sub ${RepoName}-CloudWatchEventPolicy
+
+
+  CodePipelineTrustRole:
+    Type: AWS::IAM::Role
+    Description: Creating service role in IAM for AWS CodePipeline
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - codepipeline.amazonaws.com
+          Sid: 1
+      Path: /
+      Policies:
+      - PolicyDocument:
+          Statement:
+          - Action:
+              - codecommit:CancelUploadArchive
+              - codecommit:GetBranch
+              - codecommit:GetCommit
+              - codecommit:GetUploadArchiveStatus
+              - codecommit:UploadArchive
+            Effect: Allow
+            Resource: !Sub arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:${RepoName}
+          - Action:
+              - codebuild:StartBuild
+              - codebuild:BatchGetBuilds
+              - codebuild:StopBuild
+            Effect: Allow
+            Resource:
+              - !GetAtt CodeBuildProject.Arn
+          - Action:
+              - codedeploy:CreateDeployment
+              - codedeploy:GetApplicationRevision
+              - codedeploy:GetDeployment
+              - codedeploy:GetDeploymentConfig
+              - codedeploy:RegisterApplicationRevision
+            Effect: Allow
+            Resource: '*'
+          - Action:
+              - cloudformation:DescribeStacks
+              - cloudformation:DescribeChangeSet
+              - cloudformation:CreateChangeSet
+              - cloudformation:DeleteChangeSet
+              - cloudformation:ExecuteChangeSet
+            Effect: Allow
+            Resource:  '*'
+          - Action:
+            - iam:PassRole
+            Effect: Allow
+            Resource: '*'
+          - Action:
+              - s3:PutObject
+              - s3:GetObject
+              - s3:ListBucket
+              - s3:GetBucketVersioning
+              - s3:DeleteObject
+            Effect: Allow
+            Resource: 
+              - !Sub 'arn:aws:s3:::anime-bucket-${AWS::AccountId}-${AWS::Region}/*'
+          - Action:
+              - s3:ListBucket
+            Effect: Allow
+            Resource: 
+              - !Sub 'arn:aws:s3:::anime-bucket-${AWS::AccountId}-${AWS::Region}'
+        PolicyName: !Ref CodePipelineRolePolicy
+      RoleName: !Ref CodePipelineTrustRoleName
+
+
+  CodePipelineReleasePipeline:
+    DependsOn:
+      - CodePipelineTrustRole
+      - CodeBuildProject
+    Type: AWS::CodePipeline::Pipeline
+    Description: Creating a deployment pipeline for your project in AWS CodePipeline
+    Properties:
+      Name: !Ref ReleasePipelineName
+      RoleArn: !GetAtt CodePipelineTrustRole.Arn
+      ArtifactStore:
+        Location: !ImportValue AnimeBucketName
+        Type: S3
+      Stages:
+      - Name: Source
+        Actions:
+        - ActionTypeId:
+            Category: Source
+            Owner: AWS
+            Provider: CodeCommit
+            Version: 1
+          Configuration:
+            BranchName: master
+            PollForSourceChanges: false
+            RepositoryName: !Ref RepoName
+          Name: ApplicationSource
+          RunOrder: 1
+          OutputArtifacts:
+            - Name: SourceArtifact
+      - Name: Build
+        Actions:
+        - ActionTypeId:
+            Category: Build
+            Owner: AWS
+            Provider: CodeBuild
+            Version: 1
+          Configuration:
+            ProjectName: !Ref CodeBuildProjectName
+          Name: Build
+          RunOrder: 1
+          InputArtifacts:
+            - Name: SourceArtifact
+          OutputArtifacts:
+            - Name: BuildArtifact
+      Tags:
+        - Key: ProjectName
+          Value: !Ref ProjectName
 
 
 Outputs:
@@ -32,3 +463,24 @@ Outputs:
   DataAppRepoURLArn:
     Value: !GetAtt DataAppRepo.Arn
     Description: Arn of the CodeCommit Repository
+  CMKId:
+    Value: !Ref EncryptKey
+    Description: Id of the KMS CMK
+  CMKArn:
+    Value: !GetAtt EncryptKey.Arn
+    Description: Arn of the KMS CMK
+  ECRRepoName:
+    Value: !Ref ECRRepository
+    Description: Name of the ECR repo hat stores the docker images
+  ECRRepoName:
+    Value: !GetAtt ECRRepository.Arn
+    Description: Arn of the ECR repo hat stores the docker images
+  CodeBuildProjectName:
+    Value: !Ref CodeBuildProject
+    Description: Name of the CodeBuild project responsible to build our images
+  CodeBuildProjectArn:
+    Value: !GetAtt CodeBuildProject.Arn
+    Description: Arn of the CodeBuild project responsible to build our images
+  CodePipelineReleasePipelineName:
+    Value: !Ref CodePipelineReleasePipeline
+    Description: Name of the CodePipeline release pipeline

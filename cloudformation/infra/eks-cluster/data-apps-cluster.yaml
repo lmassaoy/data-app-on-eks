@@ -1,0 +1,43 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: data-apps
+  region: us-east-1
+  tags:
+    ProjectName: DataAppOnEKS
+
+nodeGroups:
+  - name: kubernetes-management-services-ng
+    instanceType: t4g.medium
+    desiredCapacity: 1
+    volumeSize: 40
+    privateNetworking: true
+
+fargateProfiles:
+  - name: fp-default
+    selectors:
+      - namespace: default
+      - namespace: kube-system
+    tags:
+      ProjectName: DataAppOnEKS
+  - name: fp-data-apps
+    selectors:
+      - namespace: data-apps
+    tags:
+      ProjectName: DataAppOnEKS
+
+iam:
+  withOIDC: true
+  serviceAccounts:
+  - metadata:
+      name: data-apps-service-account
+      namespace: data-apps
+    attachPolicyARNs:
+    - "arn:aws:iam::790777599382:policy/ReadWriteAnimeBucketObjects"
+    tags:
+      ProjectName: DataAppOnEKS
+
+cloudWatch:
+    clusterLogging:
+        enableTypes: ["*"]

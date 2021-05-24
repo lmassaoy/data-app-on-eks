@@ -6,28 +6,30 @@
     - https://eksctl.io/introduction/
 - kubectl (latest)
 - AWS CLI already configured (version >= 2.1.6)
-
+- export AWS_ACCOUNT=<your_account_id>
+    - example: 790777599382
 
 ## Step-by-Step
 
-1. Creating the cluster
+### Security
 
-    Running the following command creates a stack at CloudFormation that will build the Amazon EKS clusters using AWS Fargate profiles:
+1. Create a policy that allows our containers to access the AWS components
 
-    Option A - with config file
+    Run the following command and save the Arn for later:
     ```
-    $ eksctl create cluster -f cloudformation/infra/eks-cluster/eks-cluster.yaml
+    $ aws iam create-policy --policy-name ReadWriteAnimeBucketObjects --policy-document file://cloudformation/infra/eks-cluster/read-write-s3-policy-doc.json
     ```
-    Option B - simpler version
-    ```
-    $ eksctl create cluster \
-        --region us-east-1 \
-        --name data-apps-cluster \
-        --fargate \
-        --tags ProjectName=DataAppOnEKS
-    ```
-    *Note that the process may take several minutes (around 30)*
+    ![S3-Policy.png](../../../images/S3-Policy.png)
 
+### Cluster + Fargate Profile + Node Group + Service Account
+
+1. Creating the cluster and its resources
+
+    Running the following command creates a stack at CloudFormation that will build the Amazon EKS clusters using AWS EC2 Auto-Scaling (Node Group), Fargate profiles, and IAM role (Service Account):
+    ```
+    $ eksctl create cluster -f cloudformation/infra/eks-cluster/data-apps-cluster.yaml
+    ```
+    ![CF-Stacks.png](../../../images/CF-Stacks.png)
 
 2. Testing the configuration using kubectl
 
@@ -35,14 +37,14 @@
     ```
     $ kubectl get svc
     ```
-    should get an output like this:
+    the output should be like this:
     ```
     NAME         TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
     kubernetes   ClusterIP   172.20.0.1   <none>        443/TCP   31m
     ```
     This means you're ready to start using the EKS cluster.
 
-3. Create a Fargate Profile which will be used with the applications soon, and a Namespace named as "data-apps":
+<!-- 3. Create a Fargate Profile which will be used with the applications soon, and a Namespace named as "data-apps":
     
     Create a new Fargate Profile for the Namespace: "data-apps":
 
@@ -56,9 +58,30 @@
 
     ```
     $ eksctl create fargateprofile --namespace data-apps --cluster kube-cluster --name fp-data-apps
+    ``` -->
+
+<!-- 5. Create an IAM OIDC identity provider
+
+    ```
+    $ eksctl utils associate-iam-oidc-provider --cluster data-apps-cluster --approve
     ```
 
-## Optional Tasks - Cluster Monitoring Tools
+6. Create an IAM Service Role for the containers
+
+    ```
+    $ eksctl create iamserviceaccount \
+        --name data-apps-service-account \
+        --namespace data-apps \
+        --cluster data-apps-cluster \
+        --attach-policy-arn arn:aws:iam::$AWS_ACCOUNT:policy/ReadWriteAnimeBucketObjects \
+        --approve \
+        --override-existing-serviceaccounts
+    ``` -->
+
+## Optional Tasks
+
+### Cluster Monitoring Tools
+
 1. Setup the Kubernetes Metrics Server
     - https://docs.aws.amazon.com/eks/latest/userguide/metrics-server.html
 
@@ -69,6 +92,6 @@
     - install Helm: https://docs.aws.amazon.com/eks/latest/userguide/helm.html
     - add a nodegroup (Prometheus' deployments need EBS volumes in order to work properly):
         ```
-        $ eksctl create nodegroup --config-file=cloudformation/infra/eks-cluster/prometheus-ng.yaml
+        $ eksctl create nodegroup --config-file=cloudformation/infra/eks-cluster/monitoring-scripts/prometheus-ng.yaml
         ```
     - https://www.eksworkshop.com/intermediate/240_monitoring/
