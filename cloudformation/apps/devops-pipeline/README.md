@@ -4,6 +4,7 @@
 - AWS CLI already configured (version >= 2.1.6)
 - kubectl (latest)
 - export AWS_ACCOUNT=<your_account_id>
+- export AWS_REGION=<your_region>
 - Docker Hub credentials
 
 
@@ -41,6 +42,19 @@ Use the DockerHub credentials inside the parameters
 
 ![SSM-Secrets-Creation.png](../../../images/SSM-Secrets-Creation.png)
 
+## Allowing AWS CodeBuild role to execute actions on the Kubernetes cluster
+
+Update the mapRoles inside the aws-auth ConfigMap
+```
+$ kubectl edit configmap aws-auth -n kube-system
+```
+```
+mapRoles: |
+  - rolearn: arn:aws:iam::<your_account_id>:role/data-app-codebuild-role
+    username: data-app-codebuild-role
+    groups:
+      - system:masters
+```
 
 ## Populating our CodeCommit repository
 
@@ -58,25 +72,15 @@ Now let's copy the scripts of our Data App into the repository and push them int
 $ sh cloudformation/apps/devops-pipeline/create-deployment-file.sh
 $ sh cloudformation/apps/devops-pipeline/push-to-codecommit.sh
 ```
-Because of the integration of the AWS CodePipeline, once the push is done, the workflow will build a Docker image into your repository in Amazon ECR
+Because of the integration of the AWS CodePipeline, once the push is done, the workflow will build a Docker image into your repository in Amazon ECR, and will wait for the deployment's approval (manual task). Once it's approved, the deployment task will create the result resources into the Amazon EKS cluster.
 
 ![CodePipeline.png](../../../images/CodePipeline.png)
 
 ![ECR.png](../../../images/ECR.png)
 
-## Deployment into Amazon EKS cluster
+![EKS-Deployment.png](../../../images/EKS-Deployment.png)
 
-To deploy the application run the following commands:
-```
-$ sh cloudformation/apps/devops-pipeline/create-deployment-file.sh
-$ kubectl create -f cloudformation/apps/devops-pipeline/deployment.yaml -n data-apps
-```
-Output:
-```
-deployment.apps/deployment-data-apps created
-horizontalpodautoscaler.autoscaling/autoscaler-data-app created
-service/data-apps-on-eks created
-```
+## Checking the results
 
 Check if the service is already exposed getting the 'EXTERNAL-IP'. 
 ```

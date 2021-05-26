@@ -131,3 +131,6 @@ dmypy.json
 # Application
 cloudformation/apps/devops-pipeline/data-app/
 cloudformation/apps/data-app-code/images/covers/*.jpg
+cloudformation/infra/eks-cluster/read-write-s3-policy-doc.json
+cloudformation/infra/eks-cluster/data-apps-cluster.yaml
+cloudformation/apps/data-app-code/deployment.yaml

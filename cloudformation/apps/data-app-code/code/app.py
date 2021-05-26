@@ -146,6 +146,8 @@ st.markdown(f""" <style>
 # ------------------------------------------------------------------------------------------------------------------------
 # Main
 
+st.write('update testing CI/CD - update 16h50')
+
 generate_page_header()
 
 title("Architecture",35,"center","white")

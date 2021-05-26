@@ -113,7 +113,7 @@ $ sh cloudformation/infra/eks-cluster/generate-config-files.sh
     2021-05-23 17:33:45 [✔]  saved kubeconfig as "/Users/luisyama/.kube/config"
     2021-05-23 17:33:45 [ℹ]  no tasks
     2021-05-23 17:33:45 [✔]  all EKS cluster resources for "data-apps" have been created
-    2021-05-23 17:33:46 [ℹ]  adding identity "arn:aws:iam::790777599382:role/eksctl-data-apps-nodegroup-kubern-NodeInstanceRole-LWECDD6IIPKG" to auth ConfigMap
+    2021-05-23 17:33:46 [ℹ]  adding identity "arn:aws:iam::<your_account_id>:role/eksctl-data-apps-nodegroup-kubern-NodeInstanceRole-LWECDD6IIPKG" to auth ConfigMap
     2021-05-23 17:33:47 [ℹ]  nodegroup "kubernetes-management-services-ng" has 0 node(s)
     2021-05-23 17:33:47 [ℹ]  waiting for at least 1 node(s) to become ready in "kubernetes-management-services-ng"
     2021-05-23 17:34:14 [ℹ]  nodegroup "kubernetes-management-services-ng" has 1 node(s)

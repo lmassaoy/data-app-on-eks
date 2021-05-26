@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cat <<EOF >cloudformation/apps/devops-pipeline/deployment.yaml
+cat <<EOF >cloudformation/apps/data-app-code/deployment.yaml
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -16,6 +16,7 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: data-app
+        deploy-date: $(date +"%Y-%m-%d-%H-%M-%S")
     spec:
       serviceAccountName: data-apps-service-account
       containers:
@@ -78,5 +79,3 @@ spec:
   selector:
     app.kubernetes.io/name: data-app
 EOF
-
-cp cloudformation/apps/devops-pipeline/deployment.yaml cloudformation/apps/data-app-code/deployment.yaml

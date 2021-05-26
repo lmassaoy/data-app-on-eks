@@ -13,6 +13,7 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: data-app
+        deploy-date: 2021-05-26-18-18-59
     spec:
       serviceAccountName: data-apps-service-account
       containers:

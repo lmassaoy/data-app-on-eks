@@ -36,10 +36,14 @@ Parameters:
     Default: data-app-codebuild-policy
     Type: String
     Description: Name of the policy used for the CodeBuild role
-  CodeBuildProjectName:
+  CodeBuildProjectBuildName:
     Default: data-app-build
     Type: String
-    Description: CodeBuild project name
+    Description: CodeBuild project name - build phase
+  CodeBuildProjectDeployName:
+    Default: data-app-deployment
+    Type: String
+    Description: CodeBuild project name - deploy phase
   # CodePipeline
   CodePipelineRolePolicy:
     Default: data-app-codepipeline-policy
@@ -57,7 +61,13 @@ Parameters:
   SourceEventName:
     Default: data-app-trigger-source-event
     Type: String
-    Description: Name of the policy used for the CodePipeline role 
+    Description: Name of the policy used for the CodePipeline role
+  # EKS
+  EKSClusterName:
+    Default: data-apps
+    Type: String
+    Description: Name of the Kubernetes cluster running on EKS
+
 
 Resources:
   CMKAlias:
@@ -158,8 +168,11 @@ Resources:
             - logs:PutLogEvents
           Effect: Allow
           Resource:
-            - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${CodeBuildProjectName}"
-            - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${CodeBuildProjectName}:*
+            - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${CodeBuildProjectBuildName}"
+            - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${CodeBuildProjectBuildName}:*
+            - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${CodeBuildProjectDeployName}"
+            - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${CodeBuildProjectDeployName}:*
+            
         - Action:
             - s3:PutObject
             - s3:GetObject
@@ -182,7 +195,7 @@ Resources:
             - codebuild:BatchPutCodeCoverages
           Effect: Allow
           Resource:
-            - !Sub arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/${CodeBuildProjectName}-*
+            - !Sub arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/${CodeBuildProjectBuildName}-*
         - Action:
             - ecr:GetAuthorizationToken
           Effect: Allow
@@ -225,6 +238,13 @@ Resources:
           Effect: Allow
           Resource: 
             - !Sub 'arn:aws:s3:::anime-bucket-${AWS::AccountId}-${AWS::Region}'
+        - Action:
+            - eks:DescribeNodegroup
+            - eks:DescribeUpdate
+            - eks:DescribeCluster
+          Effect: Allow
+          Resource:
+            - !Sub 'arn:aws:eks:${AWS::Region}:${AWS::AccountId}:cluster/${EKSClusterName}'                  
 
 
   CodeBuildRole:
@@ -241,13 +261,14 @@ Resources:
       RoleName: !Ref CodeBuildRoleName
 
 
-  CodeBuildProject:
+  CodeBuildProjectBuild:
     DependsOn:
       - CodeBuildRole
     Type: AWS::CodeBuild::Project
     Properties:
-      Name: !Ref CodeBuildProjectName
+      Name: !Ref CodeBuildProjectBuildName
       Description: CodeBuild project to build our docker image and push it into ECR repository
+      EncryptionKey: !Ref CMKAlias
       Artifacts:
         Type: no_artifacts
       Environment:
@@ -279,11 +300,49 @@ Resources:
       SourceVersion: refs/heads/master
       LogsConfig:
         CloudWatchLogs:
-          GroupName: !Sub /aws/codebuild/${CodeBuildProjectName}
+          GroupName: !Sub /aws/codebuild/${CodeBuildProjectBuildName}
           Status: ENABLED
       Tags:
         - Key: ProjectName
           Value: !Ref ProjectName
+
+
+  CodeBuildProjectDeploy:
+    DependsOn:
+      - CodeBuildRole
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Ref CodeBuildProjectDeployName
+      Description: CodeBuild project to deploy our docker image into the EKS cluster
+      Artifacts:
+        Type: CODEPIPELINE
+      EncryptionKey: !Ref CMKAlias
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:3.0
+        Type: LINUX_CONTAINER
+        PrivilegedMode: True
+        EnvironmentVariables:
+          - Name: AWS_REGION
+            Type: PLAINTEXT
+            Value: !Sub ${AWS::Region}
+          - Name: AWS_ACCOUNT_ID
+            Type: PLAINTEXT
+            Value: !Sub ${AWS::AccountId}
+          - Name: EKS_CLUSTER_NAME
+            Type: PLAINTEXT
+            Value: !Ref EKSClusterName
+      ServiceRole: !Ref CodeBuildRole
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec_deployment.yml
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Sub /aws/codebuild/${CodeBuildProjectDeployName}
+          Status: ENABLED
+      Tags:
+        - Key: ProjectName
+          Value: !Ref ProjectName    
 
 
   SourceEvent:
@@ -366,7 +425,8 @@ Resources:
               - codebuild:StopBuild
             Effect: Allow
             Resource:
-              - !GetAtt CodeBuildProject.Arn
+              - !GetAtt CodeBuildProjectBuild.Arn
+              - !GetAtt CodeBuildProjectDeploy.Arn
           - Action:
               - codedeploy:CreateDeployment
               - codedeploy:GetApplicationRevision
@@ -408,13 +468,17 @@ Resources:
   CodePipelineReleasePipeline:
     DependsOn:
       - CodePipelineTrustRole
-      - CodeBuildProject
+      - CodeBuildProjectBuild
+      - CodeBuildProjectDeploy
     Type: AWS::CodePipeline::Pipeline
     Description: Creating a deployment pipeline for your project in AWS CodePipeline
     Properties:
       Name: !Ref ReleasePipelineName
       RoleArn: !GetAtt CodePipelineTrustRole.Arn
       ArtifactStore:
+        EncryptionKey:
+          Id: !GetAtt EncryptKey.Arn
+          Type: KMS
         Location: !ImportValue AnimeBucketName
         Type: S3
       Stages:
@@ -441,13 +505,41 @@ Resources:
             Provider: CodeBuild
             Version: 1
           Configuration:
-            ProjectName: !Ref CodeBuildProjectName
+            ProjectName: !Ref CodeBuildProjectBuildName
           Name: Build
           RunOrder: 1
           InputArtifacts:
             - Name: SourceArtifact
           OutputArtifacts:
             - Name: BuildArtifact
+      - Name: Approval
+        Actions:
+          - Name: Approval
+            ActionTypeId:
+              Category: Approval
+              Owner: AWS
+              Version: 1
+              Provider: Manual
+            Configuration:
+              CustomData: Do you approve the deployment of this build version?
+            InputArtifacts: []
+            OutputArtifacts: []
+            RunOrder: 3
+      - Name: Deploy
+        Actions:
+          - Name: Deploy
+            ActionTypeId:
+              Category: Build
+              Owner: AWS
+              Version: 1
+              Provider: CodeBuild
+            Configuration:
+              ProjectName: !Ref CodeBuildProjectDeployName
+            InputArtifacts:
+              - Name: SourceArtifact
+            OutputArtifacts:
+              - Name: DeployArtifact
+            RunOrder: 4
       Tags:
         - Key: ProjectName
           Value: !Ref ProjectName
@@ -475,12 +567,18 @@ Outputs:
   ECRRepoName:
     Value: !GetAtt ECRRepository.Arn
     Description: Arn of the ECR repo hat stores the docker images
-  CodeBuildProjectName:
-    Value: !Ref CodeBuildProject
+  CodeBuildProjectBuildName:
+    Value: !Ref CodeBuildProjectBuild
     Description: Name of the CodeBuild project responsible to build our images
-  CodeBuildProjectArn:
-    Value: !GetAtt CodeBuildProject.Arn
+  CodeBuildProjectDeployName:
+    Value: !Ref CodeBuildProjectDeploy
+    Description: Name of the CodeBuild project responsible to deploy our images
+  CodeBuildProjectBuildArn:
+    Value: !GetAtt CodeBuildProjectBuild.Arn
     Description: Arn of the CodeBuild project responsible to build our images
+  CodeBuildProjectDeployArn:
+    Value: !GetAtt CodeBuildProjectDeploy.Arn
+    Description: Arn of the CodeBuild project responsible to deploy our images
   CodePipelineReleasePipelineName:
     Value: !Ref CodePipelineReleasePipeline
     Description: Name of the CodePipeline release pipeline
