@@ -1,12 +1,14 @@
-#
+# How To
 
 # Infra
-## Sequence of tasks
-### 1 - [Dataset Storage](cloudformation/infra/dataset-storage/README.md)
-### 2 - [EKS cluster](cloudformation/infra/eks-cluster/README.md)
+
+### 1 - [Dataset Storage](infra/dataset-storage/README.md)
+### 2 - [EKS cluster](infra/eks-cluster/README.md)
 
 # Apps
-## Sequence of tasks
-### 1 - DevOps Pipeline
 
-### 2 - Push to AWS CodeCommit
+### 1 - [DevOps Pipeline](apps/devops-pipeline/README.md)
+
+# References
+
+[Build a Continuous Delivery Pipeline for your Container Images with Amazon ECR](https://aws.amazon.com/blogs/devops/build-a-continuous-delivery-pipeline-for-your-container-images-with-amazon-ecr-as-source/)
