@@ -1,0 +1,33 @@
+version: 0.2
+
+phases:
+  install: # Install AWS cli and kubectl
+    commands:
+       - apt-get update
+       - apt-get install -y git python3 python3-pip
+       - pip install awscli
+       - curl -o aws-iam-authenticator https://amazon-eks.s3-us-west-2.amazonaws.com/1.12.10/2019-08-14/bin/linux/amd64/aws-iam-authenticator
+       - chmod +x ./aws-iam-authenticator
+       - mkdir -p ~/bin && cp ./aws-iam-authenticator ~/bin/aws-iam-authenticator && export PATH=~/bin:$PATH
+       - curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+       - chmod +x kubectl
+       - mv ./kubectl /usr/local/bin/kubectl
+       - curl -sSL https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+  pre_build: # Add kubeconfig to access to EKS cluster and check readiness of the cluster
+    commands:
+      - mkdir ~/.kube/
+      - aws eks --region $AWS_DEFAULT_REGION update-kubeconfig --name $EKS_CLUSTER_NAME --role-arn $EKS_CODEBUILD_ROLE_ARN
+      - chmod 0600 ~/.kube/config
+      - kubectl get nodes
+      - aws sts get-caller-identity
+  
+  build: # Deploy app via kubectl
+    commands:
+      - kubectl delete -f deployment.yaml -n data-apps
+      - kubectl create -f deployment.yaml -n data-apps
+  post_build: # Display the endpoint of the application
+    commands:
+      - bash -c "if [ /"$CODEBUILD_BUILD_SUCCEEDING/" == /"0/" ]; then exit 1; fi"
+      - sleep 20
+      # - JAVA_APP_ENDPOINT=`kubectl get svc $EKS_CODEBUILD_APP_NAME-$ENV -o jsonpath="{.status.loadBalancer.ingress[*].hostname}"`
+      # - echo -e "\nThe Java application can be accessed nw via http://$JAVA_APP_ENDPOINT/hello"

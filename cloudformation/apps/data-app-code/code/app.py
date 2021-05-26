@@ -14,10 +14,6 @@ GENRES_FILE_NAME = os.environ['GENRES_FILE']
 ANIME_FILE_NAME = os.environ['ANIME_FILE']
 
 
-def build_image(path):
-    return Image.open(path)
-
-
 def session_break(times):
     for i in range(times):
         st.write('')
@@ -47,7 +43,7 @@ def generate_recommend_block(column_id,anime):
     st.markdown(f'### #{column_id} - [{anime[2]}](https://myanimelist.net/anime/{anime[1]}/)')
     download_agent = ImageRenderDownloader(int(anime[1]),str(joined_df[joined_df['id'] == anime[1]]["photo"].values[0]))
     folder_path = download_agent.download()
-    st.image(build_image(folder_path))
+    st.image(Image.open(folder_path))
 
     score = f'''
     ##### **Score**: {float(joined_df[joined_df['id'] == anime[1]]['details.Score'])}
