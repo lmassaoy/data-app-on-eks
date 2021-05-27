@@ -268,7 +268,6 @@ Resources:
     Properties:
       Name: !Ref CodeBuildProjectBuildName
       Description: CodeBuild project to build our docker image and push it into ECR repository
-      EncryptionKey: !Ref CMKAlias
       Artifacts:
         Type: no_artifacts
       Environment:
@@ -316,7 +315,6 @@ Resources:
       Description: CodeBuild project to deploy our docker image into the EKS cluster
       Artifacts:
         Type: CODEPIPELINE
-      EncryptionKey: !Ref CMKAlias
       Environment:
         ComputeType: BUILD_GENERAL1_SMALL
         Image: aws/codebuild/standard:3.0
@@ -476,9 +474,6 @@ Resources:
       Name: !Ref ReleasePipelineName
       RoleArn: !GetAtt CodePipelineTrustRole.Arn
       ArtifactStore:
-        EncryptionKey:
-          Id: !GetAtt EncryptKey.Arn
-          Type: KMS
         Location: !ImportValue AnimeBucketName
         Type: S3
       Stages:

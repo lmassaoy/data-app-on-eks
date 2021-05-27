@@ -52,15 +52,11 @@ The pipeline is composed of 4 AWS tools:
 
 The workflow in short can be reflected by the following steps:
 
-Pipeline A - Docker image building
 - code pushed to AWS CodeCommit repository
     - AWS CodeBuild gets the updates from the branch and build a new Docker image, by reading the buildspec.yml file
         - The image is stored in Amazon ECR repository
-
-Pipeline B - Deployment into Kubernetes cluster
-- a new version of the 'latest' image is posted into Amazon ECR repository
-    - AWS CodeBuild gets the new image and deploy into the EKS cluster, by reading the buildspec_deployment.yml and deployment.yaml files
-        - The Pods are created in the cluster, along the Service (ELB) and Horizontal Auto Scaling
+            - AWS CodeBuild gets the new image and deploy into the EKS cluster, by reading the buildspec_deployment.yml and deployment.yaml files
+                - The Pods are created in the cluster, along the Service (ELB) and Horizontal Auto Scaling
 
 
 # How To
