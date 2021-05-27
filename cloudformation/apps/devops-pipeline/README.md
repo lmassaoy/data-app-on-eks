@@ -96,10 +96,6 @@ Make sure the pods are running then you can access the Classic Elastic Load Bala
 
 ![Data-App-On-EKS.png](../../../images/Data-App-On-EKS.png)
 
-It's possible the Data faces problems to render images. Currently there's a known bug under fix (https://github.com/streamlit/streamlit/issues/1294).
+It's possible the app faces problems to render images. Currently there's a known bug under fix (https://github.com/streamlit/streamlit/issues/1294).
 
 ![Image-Render-Issue.png](../../../images/Image-Render-Issue.png)
-
-In case you don't face the issue when you run the application, then you'll see the results like this:
-
-![Recommendation.png](../../../images/Recommendation.png)
