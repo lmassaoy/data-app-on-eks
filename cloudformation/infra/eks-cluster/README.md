@@ -12,7 +12,7 @@
 
 First you should run the following command to create some config files:
 ```
-$ sh cloudformation/infra/eks-cluster/generate-config-files.sh
+$ sh cloudformation/infra/eks-cluster/generate-config-files.sh -r region -z az1,az2,az3,azN
 ```
 
 ### Security
