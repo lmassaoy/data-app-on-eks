@@ -1,5 +1,34 @@
 #!/bin/bash
 
+IFS=','
+
+joinByChar() {
+  echo "$*"
+}
+
+if [ -z "$AWS_ACCOUNT" ]; then
+  echo "Environment variable AWS_ACCOUNT not exists or is empty."
+  exit 0;
+fi
+
+while getopts r:z: flag
+do
+    case "${flag}" in
+        r) REGION=${OPTARG};;
+        z) AZS=${OPTARG};;
+        *) exit
+    esac
+done
+
+AVAILABILITY_ZONES_LIST=()
+read -r -a AZS <<< "$AZS"
+for az in "${AZS[@]}";
+do
+   AVAILABILITY_ZONES_LIST+=(\""$az"\")
+done
+
+AVAILABILITY_ZONES=$(joinByChar "${AVAILABILITY_ZONES_LIST[*]}")
+
 cat <<EOF >cloudformation/infra/eks-cluster/read-write-s3-policy-doc.json
 {
     "Version": "2012-10-17",
@@ -14,7 +43,10 @@ cat <<EOF >cloudformation/infra/eks-cluster/read-write-s3-policy-doc.json
                 "s3:GetBucketVersioning",
                 "s3:DeleteObject"
             ],
-            "Resource": "arn:aws:s3:::anime-bucket-$AWS_ACCOUNT-us-east-1/*"
+            "Resource": [
+              "arn:aws:s3:::anime-bucket-$AWS_ACCOUNT-$REGION/*",
+              "arn:aws:s3:::anime-bucket-$AWS_ACCOUNT-$REGION"
+            ]
         }
     ]
 }
@@ -26,7 +58,7 @@ kind: ClusterConfig
 
 metadata:
   name: data-apps
-  region: us-east-1
+  region: $REGION
   tags:
     ProjectName: DataAppOnEKS
 
@@ -36,6 +68,7 @@ nodeGroups:
     desiredCapacity: 1
     volumeSize: 40
     privateNetworking: true
+    availabilityZones: [$AVAILABILITY_ZONES]
 
 fargateProfiles:
   - name: fp-default
