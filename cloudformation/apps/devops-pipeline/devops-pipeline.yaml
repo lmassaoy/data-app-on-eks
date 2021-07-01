@@ -559,7 +559,7 @@ Outputs:
   ECRRepoName:
     Value: !Ref ECRRepository
     Description: Name of the ECR repo hat stores the docker images
-  ECRRepoName:
+  ECRRepoArn:
     Value: !GetAtt ECRRepository.Arn
     Description: Arn of the ECR repo hat stores the docker images
   CodeBuildProjectBuildName:
