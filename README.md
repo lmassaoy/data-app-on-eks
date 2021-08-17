@@ -62,3 +62,6 @@ The workflow in short can be reflected by the following steps:
 # How To
 
 Please follow the [link](cloudformation/README.md) to understand how to proceed.
+
+# Credits
+I'd like to say a special thanks to [Ian](https://github.com/ianrapha) and [Carlos](https://github.com/tafinel) for the reviews made on the project :)
