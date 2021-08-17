@@ -11,7 +11,7 @@ This project is a suggestion about how it's possible to build and delivery data 
 
 In order to accelerate the delivery of the apps, we offer a model of a CI/CD pipeline using many modern and reliable tools from AWS. Responding to every change of the code, building new versions of Docker images and finally deploying into the Kubernetes cluster.
 
-![Project-Architecture.png](images/Project-Architecture.png)
+![Project-Diagram.png](images/Project-Diagram.png)
 
 ## Dataset
 
