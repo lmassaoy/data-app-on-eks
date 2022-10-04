@@ -1,4 +1,4 @@
 boto3==1.17.77
 awswrangler==2.8.0
-streamlit==0.82.0
+streamlit==1.11.1
 altair==4.1.0
